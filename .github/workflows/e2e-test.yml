@@ -9,19 +9,19 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container:
+      image: cypress/base:14
+      options: --user root
 
-    strategy:
-      matrix:
-        node-version: [14.x] # Se recomienda simplificar a versiones compatibles con Cypress
+    services:
+      mongodb:
+        image: mongo:4.4
+        ports:
+          - 27017:27017
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
 
       - name: Cache node modules
         uses: actions/cache@v4
@@ -34,5 +34,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run E2E tests
-        run: npm run test:e2e
+      - name: Start database seed and application
+        run: |
+          npm run db:seed || true
+          nohup npm start &
+          sleep 10
+        env:
+          MONGODB_URI: mongodb://mongodb:27017/nodegoat
+
+      - name: Run Cypress tests
+        run: npx cross-env NODE_ENV=test cypress run
